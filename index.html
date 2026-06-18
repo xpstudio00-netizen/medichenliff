@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MEDICHEN - ฟอร์มสั่งซื้อสินค้า</title>
+    <title>MEDICHEN - ส่งเอกสารให้ AI อัจฉริยะ</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
@@ -16,6 +16,7 @@
             --text-muted: #64748b;
             --border: #e2e8f0;
             --success: #10b981;
+            --ai-color: #8b5cf6; /* สีม่วงสำหรับ AI */
         }
 
         * {
@@ -79,10 +80,11 @@
             border-radius: 16px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.05);
             border: 1px solid var(--border);
+            border-top: 4px solid var(--ai-color);
         }
 
         .form-group {
-            margin-bottom: 16px;
+            margin-bottom: 20px;
         }
 
         .form-group label {
@@ -104,25 +106,46 @@
             transition: all 0.2s;
         }
 
+        /* ตกแต่งช่องอัปโหลดไฟล์ */
+        input[type="file"] {
+            padding: 10px;
+            background-color: #f1f5f9;
+            cursor: pointer;
+        }
+
+        input[type="file"]::file-selector-button {
+            background-color: var(--text-main);
+            color: white;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            margin-right: 12px;
+            cursor: pointer;
+            font-family: 'Prompt', sans-serif;
+            font-size: 14px;
+        }
+
         .form-control:focus {
-            border-color: var(--primary);
+            border-color: var(--ai-color);
             background-color: var(--surface);
-            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
         }
 
-        .row {
-            display: flex;
-            gap: 12px;
-        }
-
-        .col {
-            flex: 1;
+        .ai-badge {
+            display: inline-block;
+            background: rgba(139, 92, 246, 0.1);
+            color: var(--ai-color);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 10px;
         }
 
         .btn-submit {
             width: 100%;
             padding: 14px;
-            background-color: var(--primary);
+            background: linear-gradient(135deg, var(--primary), var(--ai-color));
             color: white;
             border: none;
             border-radius: 8px;
@@ -130,15 +153,15 @@
             font-weight: 600;
             cursor: pointer;
             margin-top: 10px;
-            transition: background 0.2s;
+            transition: opacity 0.2s;
         }
 
         .btn-submit:hover {
-            background-color: var(--primary-hover);
+            opacity: 0.9;
         }
 
         .btn-submit:disabled {
-            background-color: #cbd5e1;
+            background: #cbd5e1;
             cursor: not-allowed;
         }
 
@@ -146,21 +169,23 @@
         #loading-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255,255,255,0.8);
+            background: rgba(255,255,255,0.9);
             display: none;
             justify-content: center;
             align-items: center;
             flex-direction: column;
             z-index: 1000;
+            text-align: center;
+            padding: 20px;
         }
 
         .spinner {
-            width: 40px; height: 40px;
+            width: 50px; height: 50px;
             border: 4px solid var(--border);
-            border-top: 4px solid var(--primary);
+            border-top: 4px solid var(--ai-color);
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-bottom: 16px;
+            margin-bottom: 20px;
         }
 
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -170,63 +195,48 @@
 
     <div class="header">
         <h2>MEDICHEN</h2>
-        <p>ระบบสั่งซื้อสินค้าทางการแพทย์</p>
+        <p>ระบบอัปโหลดเอกสารสั่งซื้อ (AI Scanner)</p>
     </div>
 
     <div id="profile-section">
         <img id="profile-img" src="https://via.placeholder.com/45" alt="Profile">
         <div>
-            <div style="font-size: 12px; color: var(--text-muted);">สั่งซื้อในนาม</div>
+            <div style="font-size: 12px; color: var(--text-muted);">อัปโหลดในนาม</div>
             <div id="profile-name">กำลังโหลดข้อมูล...</div>
         </div>
     </div>
 
     <div class="form-card">
+        <div class="ai-badge">✨ ประมวลผลด้วย AI</div>
         <form id="order-form">
             <div class="form-group">
-                <label>ชื่อสินค้า / รายละเอียดที่ต้องการสั่ง</label>
-                <input type="text" id="product" class="form-control" placeholder="เช่น ถุงมือแพทย์ Size M" required>
+                <label>หัวข้อ / ชื่อเรียกออเดอร์นี้</label>
+                <input type="text" id="order-title" class="form-control" placeholder="เช่น ใบสั่งซื้อ รพ.พญาไท เดือนตุลาคม" required>
             </div>
             
-            <div class="row">
-                <div class="form-group col">
-                    <label>จำนวน</label>
-                    <input type="number" id="qty" class="form-control" placeholder="เช่น 10" min="1" required>
-                </div>
-                <div class="form-group col">
-                    <label>หน่วย</label>
-                    <input type="text" id="unit" class="form-control" placeholder="เช่น กล่อง" required>
-                </div>
-            </div>
-
             <div class="form-group">
-                <label>ราคารวม (บาท) - ปล่อยว่างได้ถ้าไม่ทราบ</label>
-                <input type="number" id="price" class="form-control" placeholder="0">
+                <label>อัปโหลดเอกสารสั่งซื้อ (PNG, JPG, PDF)</label>
+                <input type="file" id="order-file" class="form-control" accept=".png, .jpg, .jpeg, .pdf" required>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+                    * ระบบ AI จะทำการอ่านข้อมูลสินค้า จำนวน และที่อยู่ จากไฟล์ของคุณอัตโนมัติ
+                </p>
             </div>
 
-            <div class="form-group">
-                <label>ชื่อบริษัท / หน่วยงาน / โรงพยาบาล</label>
-                <input type="text" id="company" class="form-control" placeholder="เช่น โรงพยาบาลพญาไท">
-            </div>
-
-            <div class="form-group">
-                <label>ปลายทางจัดส่ง (ที่อยู่สำหรับจัดส่งอย่างละเอียด)</label>
-                <textarea id="destination" class="form-control" rows="3" placeholder="กรอกที่อยู่จัดส่งให้ชัดเจน..." required></textarea>
-            </div>
-
-            <button type="submit" class="btn-submit" id="submit-btn">ยืนยันการสั่งซื้อ</button>
+            <button type="submit" class="btn-submit" id="submit-btn">ส่งเอกสารให้ AI ตรวจสอบ</button>
         </form>
     </div>
 
     <div id="loading-overlay">
         <div class="spinner"></div>
-        <div style="color: var(--primary); font-weight: 500;">กำลังส่งออเดอร์ของคุณ...</div>
+        <div style="color: var(--text-main); font-weight: 600; font-size: 18px; margin-bottom: 8px;">AI กำลังอ่านเอกสาร...</div>
+        <div style="color: var(--text-muted); font-size: 14px;">ขั้นตอนนี้อาจใช้เวลา 10-15 วินาที<br>กรุณาอย่าเพิ่งปิดหน้าจอนะครับ</div>
     </div>
 
     <script>
-        // 🔴 อย่าลืมนำ LIFF ID จริงมาใส่แทนที่ตรงนี้
+        // 🔴 นำ LIFF ID จริงมาใส่แทนที่ตรงนี้
         const LIFF_ID = "2010384362-EurVH4Kt"; 
         
+        // 🔴 ลิงก์ Web App URL เดิม
         const API_URL = "https://script.google.com/macros/s/AKfycbzUSfC0UMS1rLJTpVBbL1koAKUkHZcLIlQvLz98J2UzSwFUo-2sdqckWaiXNoEGgWJd/exec";
         
         let userName = "ลูกค้า (ไม่ได้ล็อกอิน LINE)";
@@ -242,7 +252,6 @@
                     document.getElementById('profile-name').innerText = profile.displayName;
                     document.getElementById('profile-section').style.display = 'flex';
                 } else {
-                    // หากเปิดบน Browser ทั่วไป บังคับให้ล็อกอิน LINE ก่อน
                     liff.login();
                 }
             } catch (err) {
@@ -252,32 +261,56 @@
 
         initializeLiff();
 
+        // ฟังก์ชันแปลงไฟล์เป็น Base64
+        function getBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]); // ตัดส่วนหัว (Data URI scheme) ออก
+                reader.onerror = error => reject(error);
+            });
+        }
+
         // 2. จัดการเมื่อกดปุ่ม Submit
         document.getElementById('order-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const btn = document.getElementById('submit-btn');
             const overlay = document.getElementById('loading-overlay');
+            const fileInput = document.getElementById('order-file');
+            
+            if(fileInput.files.length === 0) {
+                alert("กรุณาเลือกไฟล์เอกสารก่อนครับ");
+                return;
+            }
+
+            const file = fileInput.files[0];
+
+            // ตรวจสอบขนาดไฟล์เบื้องต้น (กันแอปแครช) จำกัดที่ 5MB
+            if(file.size > 5 * 1024 * 1024) {
+                alert("ขนาดไฟล์ใหญ่เกินไป กรุณาอัปโหลดไฟล์ขนาดไม่เกิน 5MB ครับ");
+                return;
+            }
             
             btn.disabled = true;
             overlay.style.display = 'flex';
 
-            // เตรียมข้อมูลส่งไปที่ Apps Script
-            const payload = {
-                action: 'addFormOrder',
-                data: {
-                    product: document.getElementById('product').value,
-                    qty: document.getElementById('qty').value,
-                    unit: document.getElementById('unit').value,
-                    price: document.getElementById('price').value || 0,
-                    company: document.getElementById('company').value, // แก้ไขแล้ว: มีฟิลด์รองรับแล้ว
-                    destination: document.getElementById('destination').value,
-                    customerName: userName, 
-                    status: 'ออเดอร์ใหม่'
-                }
-            };
-
             try {
+                // แปลงไฟล์เป็นข้อความ Base64
+                const base64Data = await getBase64(file);
+
+                // เตรียมข้อมูลส่งไปที่ Apps Script (เปลี่ยน action เป็น processAIOrder)
+                const payload = {
+                    action: 'processAIOrder',
+                    data: {
+                        title: document.getElementById('order-title').value,
+                        customerName: userName,
+                        fileName: file.name,
+                        mimeType: file.type,
+                        fileBase64: base64Data
+                    }
+                };
+
                 const response = await fetch(API_URL, {
                     method: "POST",
                     mode: "cors",
@@ -290,15 +323,15 @@
                 if(result.status === 'success') {
                     overlay.style.display = 'none';
                     
-                    // สั่งให้ LIFF ส่งข้อความกลับเข้าห้องแชท
+                    // แจ้งเตือนกลับเข้าแชท
                     if (liff.isLoggedIn() && liff.isInClient()) {
                         await liff.sendMessages([{
                             type: "text",
-                            text: `📝 ส่งคำสั่งซื้อสำเร็จ!\nรายการ: ${payload.data.product}\nจำนวน: ${payload.data.qty} ${payload.data.unit}`
+                            text: `🤖 AI ได้รับเอกสาร "${payload.data.title}" เรียบร้อยแล้ว ระบบกำลังคัดแยกข้อมูลลงแดชบอร์ดครับ`
                         }]);
-                        liff.closeWindow(); // ปิดหน้าต่าง LIFF ทันที
+                        liff.closeWindow(); 
                     } else {
-                        alert("การสั่งซื้อสำเร็จ ระบบได้รับข้อมูลของคุณแล้ว");
+                        alert("อัปโหลดสำเร็จ AI ได้รับข้อมูลของคุณแล้ว");
                         window.location.reload();
                     }
                 } else {
