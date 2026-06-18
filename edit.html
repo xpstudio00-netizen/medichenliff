@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MEDICHEN - ตรวจสอบและแก้ไขออเดอร์</title>
+    <!-- โหลด Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f4f6f9; font-family: 'Sarabun', sans-serif; }
+        .card { box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: none; border-radius: 10px; }
+        .img-preview { max-width: 100%; height: auto; border-radius: 8px; border: 2px dashed #ccc; }
+        .table-items input { min-width: 80px; }
+    </style>
+    <!-- โหลดฟอนต์ Sarabun สำหรับภาษาไทย -->
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="container-fluid py-4">
+    <div class="row mb-3">
+        <div class="col-12 text-center">
+            <h2 class="fw-bold text-primary"><i class="bi bi-clipboard-check"></i> ระบบยืนยันออเดอร์ (Confirm Order)</h2>
+            <p id="orderIdDisplay" class="text-muted">กำลังโหลดข้อมูล...</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- ฝั่งซ้าย: ดูรูปภาพใบสั่งซื้อ -->
+        <div class="col-lg-5 mb-4">
+            <div class="card p-3 h-100">
+                <h5 class="fw-bold border-bottom pb-2"><i class="bi bi-image"></i> เอกสารอ้างอิง (PO)</h5>
+                <div class="text-center mt-3">
+                    <img id="poImage" src="https://via.placeholder.com/600x800?text=กำลังโหลดรูปภาพ..." class="img-preview" alt="PO Image">
+                </div>
+            </div>
+        </div>
+
+        <!-- ฝั่งขวา: ฟอร์มแก้ไขข้อมูล -->
+        <div class="col-lg-7 mb-4">
+            <div class="card p-4 h-100">
+                <form id="editOrderForm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">วันที่คอนเฟิร์ม (อิงจากเอกสาร)</label>
+                            <input type="text" id="confirmDate" class="form-control" placeholder="เช่น 15/6/69">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">ชื่อคนคอนเฟิร์ม (แอดมิน)</label>
+                            <input type="text" id="adminName" class="form-control" placeholder="ชื่อแอดมิน" required>
+                        </div>
+                        
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold">ชื่อโรงพยาบาล / ลูกค้า</label>
+                            <input type="text" id="hospitalName" class="form-control" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">เลขที่ผู้เสียภาษี</label>
+                            <input type="text" id="taxId" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">เบอร์โทรศัพท์</label>
+                            <input type="text" id="phone" class="form-control">
+                        </div>
+
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold">ที่อยู่จัดส่ง / ออกบิล</label>
+                            <textarea id="address" class="form-control" rows="2"></textarea>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">เลขที่ PO</label>
+                            <input type="text" id="poNumber" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">หมายเหตุ</label>
+                            <input type="text" id="note" class="form-control" placeholder="ถ้ามี">
+                        </div>
+
+                        <!-- ส่วนรายการสินค้า -->
+                        <div class="col-12 mt-4">
+                            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+                                <h5 class="fw-bold mb-0"><i class="bi bi-box-seam"></i> รายการสินค้า</h5>
+                                <button type="button" class="btn btn-sm btn-success" onclick="addItemRow()">+ เพิ่มรายการ</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-items" id="itemsTable">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>ชื่อสินค้า</th>
+                                            <th width="15%">หน่วยละ</th>
+                                            <th width="15%">จำนวน</th>
+                                            <th width="20%">รวมเป็นเงิน</th>
+                                            <th width="10%">ลบ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="itemsBody">
+                                        <!-- สินค้าจะถูกเพิ่มที่นี่ผ่าน JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- ส่วนสรุปยอดและเงื่อนไข -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">ยอดรวมสุทธิ (บาท)</label>
+                            <input type="number" id="totalAmount" class="form-control fw-bold text-danger" step="0.01" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">รูปแบบภาษี (VAT)</label>
+                            <select id="vatType" class="form-select">
+                                <option value="สินค้ารวม VAT">สินค้ารวม VAT</option>
+                                <option value="สินค้าไม่รวม VAT">สินค้าไม่รวม VAT</option>
+                                <option value="สินค้าไม่มี VAT">สินค้าไม่มี VAT</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">เงื่อนไขการชำระเงิน</label>
+                            <input type="text" id="conditions" class="form-control" value="ชำระเงินใน 30 วัน">
+                        </div>
+                        
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold">กำหนดส่ง</label>
+                            <input type="text" id="deliveryDate" class="form-control" placeholder="เช่น ด่วน / หรือ ระบุวันที่">
+                        </div>
+
+                        <div class="col-12 mt-4">
+                            <button type="submit" class="btn btn-primary w-100 py-2 fs-5 fw-bold" id="btnSubmit">
+                                <i class="bi bi-send-check"></i> บันทึกและยืนยันออเดอร์
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 🔴 1. ใส่ลิงก์ Google Apps Script Web App ของคุณที่นี่
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw3AihY5BBMQSj0vPpFWdVo4N9m8-MbT1RMlt4C9Pk/dev'; 
+    let currentOrderId = '';
+
+    // เมื่อโหลดหน้าเว็บเสร็จ
+    document.addEventListener("DOMContentLoaded", () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        currentOrderId = urlParams.get('id');
+
+        if (!currentOrderId) {
+            alert('ไม่พบรหัสออเดอร์ (ID) ใน URL');
+            document.getElementById('orderIdDisplay').innerText = "❌ เกิดข้อผิดพลาด: ไม่พบ ID";
+            return;
+        }
+
+        document.getElementById('orderIdDisplay').innerText = `ออเดอร์: ${currentOrderId}`;
+        fetchOrderData(currentOrderId);
+    });
+
+    // ดึงข้อมูลออเดอร์จาก Backend
+    async function fetchOrderData(id) {
+        try {
+            // ในที่นี้สมมติว่าคุณมีฟังก์ชันหลังบ้านที่สามารถดึงข้อมูลได้ (หรือใช้ getLineOrders แล้วมากรองฝั่งเว็บ)
+            const response = await fetch(SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'getLineOrders' })
+            });
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                // หาแถวที่มี ID ตรงกัน
+                const orderData = result.data.find(row => row.id === id);
+                
+                if (orderData) {
+                    // เติมข้อมูลลงฟอร์ม
+                    document.getElementById('hospitalName').value = orderData.company || '';
+                    document.getElementById('address').value = orderData.destination || '';
+                    document.getElementById('totalAmount').value = orderData.price || 0;
+                    
+                    // สมมติว่า AI บันทึก JSON สินค้าไว้ในช่อง product (ตามแผนที่วางไว้)
+                    try {
+                        const items = JSON.parse(orderData.product);
+                        if(Array.isArray(items)) {
+                            items.forEach(item => addItemRow(item.name, item.price, item.qty, item.total));
+                        } else {
+                            addItemRow(orderData.product, 0, orderData.qty, orderData.price);
+                        }
+                    } catch(e) {
+                        // ถ้าไม่ใช่ JSON แสดงว่าเป็นข้อความธรรมดา
+                        addItemRow(orderData.product, 0, orderData.qty, orderData.price);
+                    }
+
+                    // สมมติว่าเราแก้ไข Backend ให้แนบ Base64 มาในคอลัมน์ที่ 10/11
+                    if(orderData.fileBase64) {
+                        document.getElementById('poImage').src = orderData.fileBase64;
+                    } else {
+                        document.getElementById('poImage').src = "https://via.placeholder.com/600x800?text=ไม่มีรูปภาพแนบมา";
+                    }
+
+                } else {
+                    alert('ไม่พบข้อมูลออเดอร์นี้ในระบบ');
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            alert('โหลดข้อมูลล้มเหลว กรุณารีเฟรชหน้าเว็บ');
+        }
+    }
+
+    // ฟังก์ชันเพิ่มรายการสินค้าในตาราง
+    function addItemRow(name = '', price = 0, qty = 1, total = 0) {
+        const tbody = document.getElementById('itemsBody');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="text" class="form-control item-name" value="${name}" required></td>
+            <td><input type="number" class="form-control item-price" step="0.01" value="${price}" onchange="calcRow(this)"></td>
+            <td><input type="number" class="form-control item-qty" value="${qty}" onchange="calcRow(this)"></td>
+            <td><input type="number" class="form-control item-total" step="0.01" value="${total}" readonly></td>
+            <td class="text-center"><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove(); calcGrandTotal();"><i class="bi bi-trash"></i></button></td>
+        `;
+        tbody.appendChild(tr);
+        calcGrandTotal();
+    }
+
+    // คำนวณราคาย่อยต่อแถว
+    function calcRow(el) {
+        const tr = el.closest('tr');
+        const price = parseFloat(tr.querySelector('.item-price').value) || 0;
+        const qty = parseFloat(tr.querySelector('.item-qty').value) || 0;
+        tr.querySelector('.item-total').value = (price * qty).toFixed(2);
+        calcGrandTotal();
+    }
+
+    // คำนวณยอดรวมทั้งหมด
+    function calcGrandTotal() {
+        let grandTotal = 0;
+        document.querySelectorAll('.item-total').forEach(input => {
+            grandTotal += parseFloat(input.value) || 0;
+        });
+        document.getElementById('totalAmount').value = grandTotal.toFixed(2);
+    }
+
+    // จัดการเมื่อกดปุ่มบันทึก
+    document.getElementById('editOrderForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        document.getElementById('btnSubmit').disabled = true;
+        document.getElementById('btnSubmit').innerHTML = '<span class="spinner-border spinner-border-sm"></span> กำลังบันทึก...';
+
+        // 1. จัดเรียงข้อความให้เหมือนรูปที่ 2 ที่ต้องการ
+        const confirmDate = document.getElementById('confirmDate').value || '[ไม่ระบุวันที่]';
+        const adminName = document.getElementById('adminName').value;
+        const hospitalName = document.getElementById('hospitalName').value;
+        const taxId = document.getElementById('taxId').value || '-';
+        const address = document.getElementById('address').value;
+        const phone = document.getElementById('phone').value || '-';
+        const poNumber = document.getElementById('poNumber').value || '-';
+        const note = document.getElementById('note').value;
+        
+        let itemsText = '';
+        const rows = document.querySelectorAll('#itemsBody tr');
+        rows.forEach((tr, index) => {
+            const name = tr.querySelector('.item-name').value;
+            const price = parseFloat(tr.querySelector('.item-price').value).toFixed(2);
+            const qty = tr.querySelector('.item-qty').value;
+            const total = parseFloat(tr.querySelector('.item-total').value).toFixed(2);
+            itemsText += `${index + 1}) ${name} หน่วยละ ${price} จำนวน ${qty} รวมเป็นเงิน ${total} .-\n`;
+        });
+
+        const totalAmount = document.getElementById('totalAmount').value;
+        const vatType = document.getElementById('vatType').value;
+        const conditions = document.getElementById('conditions').value;
+        const deliveryDate = document.getElementById('deliveryDate').value || '[รอแจ้งกำหนดส่ง]';
+
+        // สร้างข้อความสรุป (Summary Text)
+        const summaryText = 
+`ขออนุญาตคอนเฟิร์มออเดอร์ครับ
+${confirmDate} (${adminName})
+
+${hospitalName}
+เลขที่ผู้เสียภาษี : ${taxId}
+${address}
+โทร ${phone}
+
+PO: ${poNumber}
+หมายเหตุ: ${note}
+
+${itemsText}
+ยอดรวมสุทธิ ${totalAmount} บาท
+${vatType}
+เงื่อนไข: ${conditions}
+กำหนดส่ง: ${deliveryDate}
+ขอบพระคุณครับ`;
+
+        // 2. เตรียมแพ็กเกจข้อมูลส่งกลับไปหลังบ้าน
+        const payload = {
+            action: 'updateLineOrder',
+            data: {
+                id: currentOrderId,
+                date: confirmDate,
+                product: summaryText, // นำข้อความที่สวยงามแล้วบันทึกทับในช่อง product
+                qty: rows.length,
+                unit: 'รายการ',
+                price: totalAmount,
+                company: hospitalName,
+                destination: address,
+                status: 'คอนเฟิร์มแล้ว',
+                customerName: adminName // เก็บชื่อแอดมินไว้ในช่อง Customer
+            }
+        };
+
+        try {
+            const response = await fetch(SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+
+            if(result.status === 'success') {
+                alert('บันทึกและคอนเฟิร์มออเดอร์สำเร็จ!');
+                // สามารถสั่งปิดหน้าต่าง LIFF ได้ที่นี่ (ถ้าเปิดใน LINE)
+                // if (typeof liff !== 'undefined') liff.closeWindow();
+            } else {
+                alert('บันทึกไม่สำเร็จ: ' + result.message);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+        } finally {
+            document.getElementById('btnSubmit').disabled = false;
+            document.getElementById('btnSubmit').innerHTML = '<i class="bi bi-send-check"></i> บันทึกและยืนยันออเดอร์';
+        }
+    });
+</script>
+
+<!-- โหลด Bootstrap JS (สำหรับ Component เล็กน้อย) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
