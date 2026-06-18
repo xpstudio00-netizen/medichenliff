@@ -320,18 +320,25 @@
                 
                 const result = await response.json();
                 
-                if(result.status === 'success') {
+if(result.status === 'success') {
                     overlay.style.display = 'none';
                     
-                    // แจ้งเตือนกลับเข้าแชท
+                    // 🔴 1. เอาลิงก์หน้าเว็บ edit.html ของคุณบน GitHub มาใส่ตรงนี้
+                    const EDIT_URL = "https://xpstudio00-netizen.github.io/medichen-edit/edit.html"; 
+                    
+                    // ดึง ID และชื่อ รพ. ที่ Apps Script ส่งกลับมา
+                    const orderId = result.data.id;
+                    const hospitalName = result.data.hospitalName || payload.data.title;
+
+                    // แจ้งเตือนกลับเข้าแชทพร้อมแนบลิงก์
                     if (liff.isLoggedIn() && liff.isInClient()) {
                         await liff.sendMessages([{
                             type: "text",
-                            text: `🤖 AI ได้รับเอกสาร "${payload.data.title}" เรียบร้อยแล้ว ระบบกำลังคัดแยกข้อมูลลงแดชบอร์ดครับ`
+                            text: `🔔 มีออเดอร์ใหม่สแกนเข้าสู่ระบบ\n🏥 รพ.: ${hospitalName}\n📝 คลิกเพื่อตรวจสอบและแก้ไขออเดอร์ได้ที่นี่:\n${EDIT_URL}?id=${orderId}`
                         }]);
                         liff.closeWindow(); 
                     } else {
-                        alert("อัปโหลดสำเร็จ AI ได้รับข้อมูลของคุณแล้ว");
+                        alert("อัปโหลดสำเร็จ AI ได้รับข้อมูลของคุณแล้ว\nดูออเดอร์ได้ที่: " + EDIT_URL + "?id=" + orderId);
                         window.location.reload();
                     }
                 } else {
