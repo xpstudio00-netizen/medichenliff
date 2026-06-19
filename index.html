@@ -233,123 +233,117 @@
     </div>
 
     <script>
-        // 🔴 นำ LIFF ID จริงมาใส่แทนที่ตรงนี้
-        const LIFF_ID = "2010384362-EurVH4Kt"; 
-        
-        // 🔴 ลิงก์ Web App URL เดิม
-        const API_URL = "https://script.google.com/macros/s/AKfycbzUSfC0UMS1rLJTpVBbL1koAKUkHZcLIlQvLz98J2UzSwFUo-2sdqckWaiXNoEGgWJd/exec";
-        
-        let userName = "ลูกค้า (ไม่ได้ล็อกอิน LINE)";
+       // 🔴 กำหนดค่าคอนฟิกพื้นฐาน
+const LIFF_ID = "2010384362-EurVH4Kt";
+const API_URL = "https://script.google.com/macros/s/AKfycbzUSfC0UMS1rLJTpVBbL1koAKUkHZcLIlQvLz98J2UzSwFUo-2sdqckWaiXNoEGgWJd/exec";
+const EDIT_URL = "https://xpstudio00-netizen.github.io/medichen-edit/edit.html"; 
 
-        // 1. Initialize LIFF
-        async function initializeLiff() {
-            try {
-                await liff.init({ liffId: LIFF_ID });
-                if (liff.isLoggedIn()) {
-                    const profile = await liff.getProfile();
-                    userName = profile.displayName;
-                    document.getElementById('profile-img').src = profile.pictureUrl;
-                    document.getElementById('profile-name').innerText = profile.displayName;
-                    document.getElementById('profile-section').style.display = 'flex';
-                } else {
-                    liff.login();
-                }
-            } catch (err) {
-                console.error("LIFF Initialization failed", err);
-            }
+let userName = "ลูกค้า (ไม่ได้ล็อกอิน LINE)";
+
+// 1. เริ่มต้นระบบ LIFF ดึงชื่อโปรไฟล์ LINE
+async function initializeLiff() {
+    try {
+        await liff.init({ liffId: LIFF_ID });
+        if (liff.isLoggedIn()) {
+            const profile = await liff.getProfile();
+            userName = profile.displayName;
+            document.getElementById('profile-img').src = profile.pictureUrl;
+            document.getElementById('profile-name').innerText = profile.displayName;
+            document.getElementById('profile-section').style.display = 'flex';
+        } else {
+            liff.login();
         }
+    } catch (err) {
+        console.error("LIFF Initialization failed", err);
+    }
+}
 
-        initializeLiff();
+initializeLiff();
 
-        // ฟังก์ชันแปลงไฟล์เป็น Base64
-        function getBase64(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => resolve(reader.result.split(',')[1]); // ตัดส่วนหัว (Data URI scheme) ออก
-                reader.onerror = error => reject(error);
-            });
-        }
+// ฟังก์ชันแปลงไฟล์รูปภาพ/PDF เป็น Base64 เพื่อส่งไปให้ Apps Script
+function getBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = error => reject(error);
+    });
+}
 
-        // 2. จัดการเมื่อกดปุ่ม Submit
-        document.getElementById('order-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const btn = document.getElementById('submit-btn');
-            const overlay = document.getElementById('loading-overlay');
-            const fileInput = document.getElementById('order-file');
-            
-            if(fileInput.files.length === 0) {
-                alert("กรุณาเลือกไฟล์เอกสารก่อนครับ");
-                return;
+// 2. จัดการเหตุการณ์เมื่อกดส่งฟอร์ม (Submit)
+document.getElementById('order-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const btn = document.getElementById('submit-btn');
+    const overlay = document.getElementById('loading-overlay');
+    const fileInput = document.getElementById('order-file');
+    
+    if(fileInput.files.length === 0) {
+        alert("กรุณาเลือกไฟล์เอกสารก่อนครับ");
+        return;
+    }
+
+    const file = fileInput.files[0];
+
+    // ตรวจสอบขนาดไฟล์ไม่ให้เกิน 5MB
+    if(file.size > 5 * 1024 * 1024) {
+        alert("ขนาดไฟล์ใหญ่เกินไป กรุณาอัปโหลดไฟล์ขนาดไม่เกิน 5MB ครับ");
+        return;
+    }
+    
+    btn.disabled = true;
+    overlay.style.display = 'flex';
+
+    try {
+        const base64Data = await getBase64(file);
+
+        // เตรียม Payload ส่งไปที่ Google Apps Script เพื่อให้ Gemini AI อ่านข้อมูล
+        const payload = {
+            action: 'processAIOrder',
+            data: {
+                title: document.getElementById('order-title').value,
+                customerName: userName,
+                fileName: file.name,
+                mimeType: file.type,
+                fileBase64: base64Data
             }
+        };
 
-            const file = fileInput.files[0];
-
-            // ตรวจสอบขนาดไฟล์เบื้องต้น (กันแอปแครช) จำกัดที่ 5MB
-            if(file.size > 5 * 1024 * 1024) {
-                alert("ขนาดไฟล์ใหญ่เกินไป กรุณาอัปโหลดไฟล์ขนาดไม่เกิน 5MB ครับ");
-                return;
-            }
-            
-            btn.disabled = true;
-            overlay.style.display = 'flex';
-
-            try {
-                // แปลงไฟล์เป็นข้อความ Base64
-                const base64Data = await getBase64(file);
-
-                // เตรียมข้อมูลส่งไปที่ Apps Script (เปลี่ยน action เป็น processAIOrder)
-                const payload = {
-                    action: 'processAIOrder',
-                    data: {
-                        title: document.getElementById('order-title').value,
-                        customerName: userName,
-                        fileName: file.name,
-                        mimeType: file.type,
-                        fileBase64: base64Data
-                    }
-                };
-
-                const response = await fetch(API_URL, {
-                    method: "POST",
-                    mode: "cors",
-                    headers: { "Content-Type": "text/plain" },
-                    body: JSON.stringify(payload)
-                });
-                
-                const result = await response.json();
-                
-                if(result.status === 'success') {
-                    overlay.style.display = 'none';
-                    
-                    // 🔴 แก้ไขแล้ว: ระบุชื่อไฟล์ edit.html ต่อท้ายให้ถูกต้อง เพื่อส่ง ID ข้ามไปหน้าแก้ไขข้อมูล
-                    const EDIT_URL = "https://xpstudio00-netizen.github.io/medichen-edit/edit.html"; 
-                    
-                    // ดึง ID และชื่อ รพ. ที่ Apps Script ส่งกลับมา
-                    const orderId = result.data.id;
-                    const hospitalName = result.data.hospitalName || payload.data.title;
-
-                    // แจ้งเตือนกลับเข้าแชทพร้อมแนบลิงก์
-                    if (liff.isLoggedIn() && liff.isInClient()) {
-                        await liff.sendMessages([{
-                            type: "text",
-                            text: `🔔 มีออเดอร์ใหม่สแกนเข้าสู่ระบบ\n🏥 รพ.: ${hospitalName}\n📝 คลิกเพื่อตรวจสอบและแก้ไขออเดอร์ได้ที่นี่:\n${EDIT_URL}?id=${orderId}`
-                        }]);
-                        liff.closeWindow(); 
-                    } else {
-                        alert("อัปโหลดสำเร็จ AI ได้รับข้อมูลของคุณแล้ว\nดูออเดอร์ได้ที่: " + EDIT_URL + "?id=" + orderId);
-                        window.location.reload();
-                    }
-                } else {
-                    throw new Error(result.message);
-                }
-            } catch (error) {
-                overlay.style.display = 'none';
-                btn.disabled = false;
-                alert("เกิดข้อผิดพลาดในการส่งข้อมูล: " + error.message);
-            }
+        const response = await fetch(API_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify(payload)
         });
+        
+        const result = await response.json();
+        
+        if(result.status === 'success') {
+            overlay.style.display = 'none';
+            
+            const orderId = result.data.id;
+            const hospitalName = result.data.hospitalName || payload.data.title;
+
+            // ส่งข้อความแจ้งเตือนกลับเข้าห้องแชท LINE พร้อมแนบลิงก์ที่มี ID
+            if (liff.isLoggedIn() && liff.isInClient()) {
+                await liff.sendMessages([{
+                    type: "text",
+                    text: `🔔 มีออเดอร์ใหม่สแกนเข้าสู่ระบบ\n🏥 รพ.: ${hospitalName}\n📝 คลิกเพื่อตรวจสอบและแก้ไขออเดอร์ได้ที่นี่:\n${EDIT_URL}?id=${orderId}`
+                }]);
+                liff.closeWindow();
+            } else {
+                alert("อัปโหลดสำเร็จ AI ได้รับข้อมูลของคุณแล้ว\nดูออเดอร์ได้ที่: " + EDIT_URL + "?id=" + orderId);
+                window.location.reload();
+            }
+        } else {
+            throw new Error(result.message);
+        }
+    } catch (error) {
+        overlay.style.display = 'none';
+        btn.disabled = false;
+        alert("เกิดข้อผิดพลาดในการส่งข้อมูล: " + error.message);
+    }
+});
     </script>
 </body>
 </html>
