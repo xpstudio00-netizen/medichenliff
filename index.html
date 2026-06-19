@@ -320,11 +320,11 @@
                 
                 const result = await response.json();
                 
-if(result.status === 'success') {
+                if(result.status === 'success') {
                     overlay.style.display = 'none';
                     
-                    // 🔴 1. เอาลิงก์หน้าเว็บ edit.html ของคุณบน GitHub มาใส่ตรงนี้
-                    const EDIT_URL = "https://xpstudio00-netizen.github.io/medichen-edit/"; 
+                    // 🔴 แก้ไขแล้ว: ระบุชื่อไฟล์ edit.html ต่อท้ายให้ถูกต้อง เพื่อส่ง ID ข้ามไปหน้าแก้ไขข้อมูล
+                    const EDIT_URL = "https://xpstudio00-netizen.github.io/medichen-edit/edit.html"; 
                     
                     // ดึง ID และชื่อ รพ. ที่ Apps Script ส่งกลับมา
                     const orderId = result.data.id;
