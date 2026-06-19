@@ -139,198 +139,180 @@
 </div>
 
 <script>
-    // 🔴 1. ใส่ลิงก์ Google Apps Script Web App ของคุณที่นี่
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw3AihY5BBMQSj0vPpFWdVo4N9m8-MbT1RMlt4C9Pk/dev'; 
-    let currentOrderId = '';
+    // 🔴 กำหนดค่าคอนฟิกพื้นฐาน (ใช้ API ตัวเดียวกับฟอร์มแรก)
+const API_URL = "https://script.google.com/macros/s/AKfycbzUSfC0UMS1rLJTpVBbL1koAKUkHZcLIlQvLz98J2UzSwFUo-2sdqckWaiXNoEGgWJd/exec";
 
-    // เมื่อโหลดหน้าเว็บเสร็จ
-    document.addEventListener("DOMContentLoaded", () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        currentOrderId = urlParams.get('id');
+// 📦 จัดการ State ของหน้าจอ
+let currentOrderId = null;
+let isEditing = false; // ตัวล็อกระบบ Auto-refresh
+let refreshInterval = null;
 
-        if (!currentOrderId) {
-            alert('ไม่พบรหัสออเดอร์ (ID) ใน URL');
-            document.getElementById('orderIdDisplay').innerText = "❌ เกิดข้อผิดพลาด: ไม่พบ ID";
-            return;
+// 1. ฟังก์ชันทำงานอัตโนมัติเมื่อเปิดหน้าจอ
+document.addEventListener("DOMContentLoaded", () => {
+    // ดึง ID ออเดอร์จาก URL (เช่น ?id=12345)
+    const urlParams = new URLSearchParams(window.location.search);
+    currentOrderId = urlParams.get('id');
+
+    if (!currentOrderId) {
+        showToast('error', 'ข้อผิดพลาด', 'ไม่พบรหัสออเดอร์ (ID) ใน URL ไม่สามารถดึงข้อมูลได้');
+        return;
+    }
+
+    // ใส่ ID รอไว้ในฟอร์มช่องลับหรือช่องแสดง ID
+    const idInput = document.getElementById('edit-line-id');
+    if (idInput) idInput.value = currentOrderId;
+
+    // เรียกดึงข้อมูลครั้งแรกทันที
+    fetchOrderData();
+
+    // เปิดระบบ Auto-refresh ทุกๆ 5 วินาที
+    startAutoRefresh();
+
+    // ตรวจจับการพิมพ์ในฟอร์ม: ถ้าผู้ใช้กำลังพิมพ์ให้หยุด Refresh ชั่วคราวเพื่อป้องกันข้อมูลหาย
+    setupEditListeners();
+});
+
+// 2. ฟังก์ชันดึงข้อมูลจาก Google Sheets ตาม ID
+async function fetchOrderData() {
+    if (isEditing) return; // ถ้ากำลังแก้ไขอยู่ ห้ามรีเฟรชทับเด็ดขาด
+
+    try {
+        const response = await fetch(`${API_URL}?action=getOrder&id=${currentOrderId}`);
+        const res = await response.json();
+
+        if (res.status === 'success' && res.data) {
+            // นำข้อมูลที่ได้จากชีตมากรอกลงใน Input แต่ละช่อง
+            mapDataToForm(res.data);
         }
+    } catch (error) {
+        console.error("Fetch data failed:", error);
+    }
+}
 
-        document.getElementById('orderIdDisplay').innerText = `ออเดอร์: ${currentOrderId}`;
-        fetchOrderData(currentOrderId);
-    });
+// 3. ฟังก์ชันกรอกข้อมูลลงช่องฟอร์ม HTML
+function mapDataToForm(data) {
+    if (document.getElementById('edit-line-product')) document.getElementById('edit-line-product').value = data.product || '';
+    if (document.getElementById('edit-line-qty')) document.getElementById('edit-line-qty').value = data.qty || '';
+    if (document.getElementById('edit-line-unit')) document.getElementById('edit-line-unit').value = data.unit || '';
+    if (document.getElementById('edit-line-price')) document.getElementById('edit-line-price').value = data.price || '';
+    if (document.getElementById('edit-line-company')) document.getElementById('edit-line-company').value = data.company || '';
+    if (document.getElementById('edit-line-destination')) document.getElementById('edit-line-destination').value = data.destination || '';
+}
 
-    // ดึงข้อมูลออเดอร์จาก Backend
-    async function fetchOrderData(id) {
-        try {
-            // ในที่นี้สมมติว่าคุณมีฟังก์ชันหลังบ้านที่สามารถดึงข้อมูลได้ (หรือใช้ getLineOrders แล้วมากรองฝั่งเว็บ)
-            const response = await fetch(SCRIPT_URL, {
-                method: 'POST',
-                body: JSON.stringify({ action: 'getLineOrders' })
-            });
-            const result = await response.json();
-            
-            if (result.status === 'success') {
-                // หาแถวที่มี ID ตรงกัน
-                const orderData = result.data.find(row => row.id === id);
-                
-                if (orderData) {
-                    // เติมข้อมูลลงฟอร์ม
-                    document.getElementById('hospitalName').value = orderData.company || '';
-                    document.getElementById('address').value = orderData.destination || '';
-                    document.getElementById('totalAmount').value = orderData.price || 0;
-                    
-                    // สมมติว่า AI บันทึก JSON สินค้าไว้ในช่อง product (ตามแผนที่วางไว้)
-                    try {
-                        const items = JSON.parse(orderData.product);
-                        if(Array.isArray(items)) {
-                            items.forEach(item => addItemRow(item.name, item.price, item.qty, item.total));
-                        } else {
-                            addItemRow(orderData.product, 0, orderData.qty, orderData.price);
-                        }
-                    } catch(e) {
-                        // ถ้าไม่ใช่ JSON แสดงว่าเป็นข้อความธรรมดา
-                        addItemRow(orderData.product, 0, orderData.qty, orderData.price);
-                    }
-
-                    // สมมติว่าเราแก้ไข Backend ให้แนบ Base64 มาในคอลัมน์ที่ 10/11
-                    if(orderData.fileBase64) {
-                        document.getElementById('poImage').src = orderData.fileBase64;
-                    } else {
-                        document.getElementById('poImage').src = "https://via.placeholder.com/600x800?text=ไม่มีรูปภาพแนบมา";
-                    }
-
-                } else {
-                    alert('ไม่พบข้อมูลออเดอร์นี้ในระบบ');
-                }
-            }
-        } catch (error) {
-            console.error('Error fetching data:', error);
-            alert('โหลดข้อมูลล้มเหลว กรุณารีเฟรชหน้าเว็บ');
+// 4. ฟังก์ชันบันทึกข้อมูลที่แก้ไขกลับไปที่ Sheets (เมื่อกดปุ่มบันทึก)
+async function updateLineOrder() {
+    const loadingToast = showToast('loading', 'กำลังบันทึกข้อมูล', 'กรุณารอสักครู่...');
+    
+    // เตรียมข้อมูลจากหน้าจอกลับส่งไปบันทึก
+    const payload = {
+        action: 'updateLineOrder',
+        data: {
+            id: currentOrderId,
+            product: document.getElementById('edit-line-product').value,
+            qty: document.getElementById('edit-line-qty').value,
+            unit: document.getElementById('edit-line-unit').value,
+            price: document.getElementById('edit-line-price').value,
+            company: document.getElementById('edit-line-company').value,
+            destination: document.getElementById('edit-line-destination').value
         }
-    }
+    };
 
-    // ฟังก์ชันเพิ่มรายการสินค้าในตาราง
-    function addItemRow(name = '', price = 0, qty = 1, total = 0) {
-        const tbody = document.getElementById('itemsBody');
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td><input type="text" class="form-control item-name" value="${name}" required></td>
-            <td><input type="number" class="form-control item-price" step="0.01" value="${price}" onchange="calcRow(this)"></td>
-            <td><input type="number" class="form-control item-qty" value="${qty}" onchange="calcRow(this)"></td>
-            <td><input type="number" class="form-control item-total" step="0.01" value="${total}" readonly></td>
-            <td class="text-center"><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove(); calcGrandTotal();"><i class="bi bi-trash"></i></button></td>
-        `;
-        tbody.appendChild(tr);
-        calcGrandTotal();
-    }
-
-    // คำนวณราคาย่อยต่อแถว
-    function calcRow(el) {
-        const tr = el.closest('tr');
-        const price = parseFloat(tr.querySelector('.item-price').value) || 0;
-        const qty = parseFloat(tr.querySelector('.item-qty').value) || 0;
-        tr.querySelector('.item-total').value = (price * qty).toFixed(2);
-        calcGrandTotal();
-    }
-
-    // คำนวณยอดรวมทั้งหมด
-    function calcGrandTotal() {
-        let grandTotal = 0;
-        document.querySelectorAll('.item-total').forEach(input => {
-            grandTotal += parseFloat(input.value) || 0;
+    try {
+        const response = await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify(payload)
         });
-        document.getElementById('totalAmount').value = grandTotal.toFixed(2);
+        const res = await response.json();
+        loadingToast.remove(); // ปิดตัวหมุนโหลดเพื่อป้องกันบัคค้าง
+
+        if (res.status === 'success') {
+            showToast('success', 'สำเร็จ', 'บันทึกข้อมูลออเดอร์เรียบร้อยแล้ว');
+            isEditing = false; // ปลดล็อกให้รีเฟรชข้อมูลต่อได้
+        } else {
+            showToast('error', 'ล้มเหลว', res.message || 'บันทึกไม่สำเร็จ');
+        }
+    } catch (error) {
+        if(loadingToast) loadingToast.remove();
+        showToast('error', 'เชื่อมต่อล้มเหลว', error.message);
+    }
+}
+
+// 5. 🤖 ฟังก์ชันสั่งให้ Gemini AI ช่วยคัดแยกข้อมูลลงฟอร์มใหม่อีกครั้ง
+async function triggerAIOrderProcess() {
+    if (!currentOrderId) return;
+
+    const loadingToast = showToast('loading', '🤖 Gemini AI กำลังวิเคราะห์', 'ระบบกำลังส่งคำสั่งคัดแยกข้อมูล...');
+    
+    try {
+        const response = await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({ action: 'processAIOrder', id: currentOrderId })
+        });
+        const res = await response.json();
+        loadingToast.remove();
+
+        if (res.status === 'success' && res.data) {
+            // เอาผลลัพธ์ที่ AI คัดแยกข้อมูลได้ล่าสุด มาหยอดใส่ฟอร์มทันที
+            mapDataToForm(res.data);
+            showToast('success', 'วิเคราะห์สำเร็จ', 'Gemini AI คัดแยกข้อมูลลงฟอร์มให้เรียบร้อยครับ');
+        } else {
+            showToast('error', 'AI ประมวลผลล้มเหลว', res.message || 'กรุณาลองใหม่อีกครั้ง');
+        }
+    } catch (error) {
+        if(loadingToast) loadingToast.remove();
+        showToast('error', 'เชื่อมต่อ AI ล้มเหลว', error.message);
+    }
+}
+
+// 6. ระบบช่วยจัดการความลื่นไหลของหน้าเว็บ (Helper Functions)
+function startAutoRefresh() {
+    refreshInterval = setInterval(() => {
+        fetchOrderData();
+    }, 5000); // รีเฟรชทุกๆ 5 วินาที
+}
+
+function setupEditListeners() {
+    // หาอินพุตทั้งหมดในฟอร์มเพื่อดักจับการพิมพ์
+    const inputs = document.querySelectorAll('#order-edit-form input, #order-edit-form select, #order-edit-form textarea');
+    inputs.forEach(input => {
+        input.addEventListener('input', () => {
+            isEditing = true; // ล็อกการรีเฟรชทันทีที่มีการเปลี่ยนแปลงข้อมูลบนจอ
+        });
+    });
+}
+
+// ระบบสร้างป๊อปอัปแจ้งเตือนอัจฉริยะ (Toast notification)
+function showToast(type, title, message) {
+    // ลบ Toast เก่าออกก่อนสร้างใหม่ (ป้องกันบัคซ้อนแผง)
+    const oldToast = document.getElementById('custom-toast');
+    if (oldToast) oldToast.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'custom-toast';
+    toast.style.position = 'fixed';
+    toast.style.bottom = '20px';
+    toast.style.right = '20px';
+    toast.style.backgroundColor = type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#3b82f6';
+    toast.style.color = 'white';
+    toast.style.padding = '16px 24px';
+    toast.style.borderRadius = '8px';
+    toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+    toast.style.zIndex = '9999';
+    toast.innerHTML = `<strong>${title}</strong><br><small>${message}</small>`;
+    
+    document.body.appendChild(toast);
+
+    // ถ้าไม่ใช่ประเภทโหลดหมุนค้าง ให้เคลียร์ตัวเองทิ้งใน 4 วินาที
+    if (type !== 'loading') {
+        setTimeout(() => { toast.remove(); }, 4000);
     }
 
-    // จัดการเมื่อกดปุ่มบันทึก
-    document.getElementById('editOrderForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        document.getElementById('btnSubmit').disabled = true;
-        document.getElementById('btnSubmit').innerHTML = '<span class="spinner-border spinner-border-sm"></span> กำลังบันทึก...';
-
-        // 1. จัดเรียงข้อความให้เหมือนรูปที่ 2 ที่ต้องการ
-        const confirmDate = document.getElementById('confirmDate').value || '[ไม่ระบุวันที่]';
-        const adminName = document.getElementById('adminName').value;
-        const hospitalName = document.getElementById('hospitalName').value;
-        const taxId = document.getElementById('taxId').value || '-';
-        const address = document.getElementById('address').value;
-        const phone = document.getElementById('phone').value || '-';
-        const poNumber = document.getElementById('poNumber').value || '-';
-        const note = document.getElementById('note').value;
-        
-        let itemsText = '';
-        const rows = document.querySelectorAll('#itemsBody tr');
-        rows.forEach((tr, index) => {
-            const name = tr.querySelector('.item-name').value;
-            const price = parseFloat(tr.querySelector('.item-price').value).toFixed(2);
-            const qty = tr.querySelector('.item-qty').value;
-            const total = parseFloat(tr.querySelector('.item-total').value).toFixed(2);
-            itemsText += `${index + 1}) ${name} หน่วยละ ${price} จำนวน ${qty} รวมเป็นเงิน ${total} .-\n`;
-        });
-
-        const totalAmount = document.getElementById('totalAmount').value;
-        const vatType = document.getElementById('vatType').value;
-        const conditions = document.getElementById('conditions').value;
-        const deliveryDate = document.getElementById('deliveryDate').value || '[รอแจ้งกำหนดส่ง]';
-
-        // สร้างข้อความสรุป (Summary Text)
-        const summaryText = 
-`ขออนุญาตคอนเฟิร์มออเดอร์ครับ
-${confirmDate} (${adminName})
-
-${hospitalName}
-เลขที่ผู้เสียภาษี : ${taxId}
-${address}
-โทร ${phone}
-
-PO: ${poNumber}
-หมายเหตุ: ${note}
-
-${itemsText}
-ยอดรวมสุทธิ ${totalAmount} บาท
-${vatType}
-เงื่อนไข: ${conditions}
-กำหนดส่ง: ${deliveryDate}
-ขอบพระคุณครับ`;
-
-        // 2. เตรียมแพ็กเกจข้อมูลส่งกลับไปหลังบ้าน
-        const payload = {
-            action: 'updateLineOrder',
-            data: {
-                id: currentOrderId,
-                date: confirmDate,
-                product: summaryText, // นำข้อความที่สวยงามแล้วบันทึกทับในช่อง product
-                qty: rows.length,
-                unit: 'รายการ',
-                price: totalAmount,
-                company: hospitalName,
-                destination: address,
-                status: 'คอนเฟิร์มแล้ว',
-                customerName: adminName // เก็บชื่อแอดมินไว้ในช่อง Customer
-            }
-        };
-
-        try {
-            const response = await fetch(SCRIPT_URL, {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
-            const result = await response.json();
-
-            if(result.status === 'success') {
-                alert('บันทึกและคอนเฟิร์มออเดอร์สำเร็จ!');
-                // สามารถสั่งปิดหน้าต่าง LIFF ได้ที่นี่ (ถ้าเปิดใน LINE)
-                // if (typeof liff !== 'undefined') liff.closeWindow();
-            } else {
-                alert('บันทึกไม่สำเร็จ: ' + result.message);
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
-        } finally {
-            document.getElementById('btnSubmit').disabled = false;
-            document.getElementById('btnSubmit').innerHTML = '<i class="bi bi-send-check"></i> บันทึกและยืนยันออเดอร์';
-        }
-    });
+    return {
+        remove: () => toast.remove()
+    };
+}
 </script>
 
 <!-- โหลด Bootstrap JS (สำหรับ Component เล็กน้อย) -->
