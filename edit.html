@@ -91,8 +91,15 @@
             display: none;
         }
 
+        .form-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
         .form-group {
             margin-bottom: 16px;
+            flex: 1;
         }
 
         .form-group label {
@@ -114,9 +121,38 @@
             transition: all 0.2s;
         }
 
+        textarea.form-control {
+            resize: vertical;
+            min-height: 80px;
+        }
+
         .form-control:focus {
             border-color: #2563eb;
             box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f0fdf4;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #bbf7d0;
+            margin-bottom: 16px;
+        }
+
+        .checkbox-group input {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .checkbox-group label {
+            margin: 0;
+            font-weight: 600;
+            color: #166534;
+            cursor: pointer;
         }
 
         .btn-group {
@@ -138,18 +174,18 @@
             text-align: center;
         }
 
-        .btn-success {
-            background: var(--success);
-            color: white;
-        }
-
-        .btn-ai {
-            background: linear-gradient(135deg, var(--primary), var(--ai-color));
-            color: white;
-        }
-
+        .btn-success { background: var(--success); color: white; }
+        .btn-ai { background: linear-gradient(135deg, var(--primary), var(--ai-color)); color: white; }
         .btn:hover { opacity: 0.9; }
         .btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+        
+        .section-divider {
+            margin: 24px 0 16px 0;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            color: #2563eb;
+            padding-bottom: 8px;
+        }
     </style>
 </head>
 <body>
@@ -170,15 +206,34 @@
     <div class="card">
         <form id="order-edit-form" onsubmit="event.preventDefault();">
             
-            <div class="form-group">
-                <label>วันที่คอนเฟิร์ม (อิงจากเอกสาร)</label>
-                <input type="text" id="edit-confirm-date" class="form-control" placeholder="เช่น 15/6/69">
+            <div class="checkbox-group">
+                <input type="checkbox" id="edit-allow-confirm">
+                <label for="edit-allow-confirm">✅ อนุญาตคอนเฟิร์มออเดอร์ (ตรวจสอบผ่านแล้ว)</label>
+            </div>
+
+            <div class="section-divider">ส่วนที่ 1: ข้อมูลการดำเนินการ (Admin)</div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>วันที่คอนเฟิร์ม</label>
+                    <input type="date" id="edit-confirm-date" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>เวลาคอนเฟิร์ม</label>
+                    <input type="time" id="edit-confirm-time" class="form-control">
+                </div>
             </div>
 
             <div class="form-group">
                 <label>ชื่อคนคอนเฟิร์ม (แอดมิน)</label>
-                <input type="text" id="edit-admin-name" class="form-control" placeholder="ชื่อแอดมิน">
+                <select id="edit-admin-name" class="form-control">
+                    <option value="">-- เลือกระบุชื่อแอดมิน --</option>
+                    <option value="มาร์ค">มาร์ค</option>
+                    <option value="แอดมินท่านอื่น">แอดมินท่านอื่น</option>
+                </select>
             </div>
+
+            <div class="section-divider">ส่วนที่ 2: ข้อมูลจากเอกสาร PO (สแกนโดย AI)</div>
 
             <div class="form-group">
                 <label>ชื่อโรงพยาบาล / ลูกค้า</label>
@@ -191,8 +246,56 @@
             </div>
 
             <div class="form-group">
-                <label>เบอร์โทรศัพท์</label>
-                <input type="text" id="edit-phone" class="form-control">
+                <label>ที่อยู่ (สำหรับจัดส่ง / ใบกำกับภาษี)</label>
+                <textarea id="edit-address" class="form-control" placeholder="ที่อยู่..."></textarea>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>เบอร์โทรศัพท์</label>
+                    <input type="text" id="edit-phone" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>เลขที่ PO</label>
+                    <input type="text" id="edit-po-number" class="form-control">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>รายการออเดอร์ (สินค้า / จำนวน)</label>
+                <textarea id="edit-items" class="form-control" placeholder="รายการสินค้า..."></textarea>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>ยอดรวมสุทธิ</label>
+                    <input type="number" id="edit-total" class="form-control" placeholder="0.00" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>การคิดภาษี (VAT)</label>
+                    <select id="edit-vat-type" class="form-control">
+                        <option value="">-- ระบุ VAT --</option>
+                        <option value="สินค้ารวม VAT">สินค้ารวม VAT</option>
+                        <option value="สินค้าไม่รวม VAT">สินค้าไม่รวม VAT</option>
+                        <option value="สินค้าไม่มี VAT">สินค้าไม่มี VAT</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>เงื่อนไข (เช่น เครดิต 30 วัน)</label>
+                    <input type="text" id="edit-conditions" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>กำหนดส่ง (วัน/เดือน/ปี)</label>
+                    <input type="text" id="edit-due-date" class="form-control" placeholder="เช่น ภายใน 7 วัน">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>หมายเหตุ (จากเอกสาร หรือเพิ่มเติม)</label>
+                <textarea id="edit-notes" class="form-control" placeholder="หมายเหตุ..."></textarea>
             </div>
 
             <div class="btn-group">
@@ -203,7 +306,7 @@
     </div>
 
     <script>
-        // 🔴 ลิงก์ Web App URL เดิมของคุณ
+        // 🔴 อย่าลืมเปลี่ยนเป็น URL Web App ตัวล่าสุด
         const API_URL = "https://script.google.com/macros/s/AKfycbzUSfC0UMS1rLJTpVBbL1koAKUkHZcLIlQvLz98J2UzSwFUo-2sdqckWaiXNoEGgWJd/exec";
 
         let currentOrderId = null;
@@ -220,17 +323,11 @@
                 return;
             }
 
-            // เริ่มดึงข้อมูลครั้งแรก
             fetchOrderData();
-
-            // เปิดระบบดึงข้อมูลอัตโนมัติทุก 5 วินาที
             startAutoRefresh();
-
-            // ดักจับการพิมพ์เพื่อล็อกไม่ให้ระบบรีเฟรชทับข้อมูลที่พิมพ์อยู่
             setupEditListeners();
         });
 
-        // ฟังก์ชันดึงข้อมูลจาก Sheets
         async function fetchOrderData() {
             if (isEditing) return;
 
@@ -250,15 +347,28 @@
             }
         }
 
-        // นำข้อมูลหยอดลงฟอร์มให้ตรง ID ช่องกรอกข้อมูล
+        // นำข้อมูลลงฟอร์ม 15 ช่อง
         function mapDataToForm(data) {
+            // Checkbox
+            if (document.getElementById('edit-allow-confirm')) document.getElementById('edit-allow-confirm').checked = data.allowConfirm === true || data.allowConfirm === "true";
+            
+            // Text / Date / Time Inputs
             if (document.getElementById('edit-confirm-date')) document.getElementById('edit-confirm-date').value = data.confirmDate || '';
-            if (document.getElementById('edit-admin-name')) document.getElementById('edit-admin-name').value = data.adminName || '';
+            if (document.getElementById('edit-confirm-time')) document.getElementById('edit-confirm-time').value = data.confirmTime || '';
             if (document.getElementById('edit-hospital-name')) document.getElementById('edit-hospital-name').value = data.hospitalName || data.company || '';
+            if (document.getElementById('edit-admin-name')) document.getElementById('edit-admin-name').value = data.adminName || '';
             if (document.getElementById('edit-tax-id')) document.getElementById('edit-tax-id').value = data.taxId || '';
+            if (document.getElementById('edit-address')) document.getElementById('edit-address').value = data.address || data.destination || '';
             if (document.getElementById('edit-phone')) document.getElementById('edit-phone').value = data.phone || '';
+            if (document.getElementById('edit-po-number')) document.getElementById('edit-po-number').value = data.poNumber || '';
+            if (document.getElementById('edit-items')) document.getElementById('edit-items').value = data.product || data.items || '';
+            if (document.getElementById('edit-total')) document.getElementById('edit-total').value = data.totalAmount || data.price || '';
+            if (document.getElementById('edit-vat-type')) document.getElementById('edit-vat-type').value = data.vatType || '';
+            if (document.getElementById('edit-conditions')) document.getElementById('edit-conditions').value = data.conditions || '';
+            if (document.getElementById('edit-due-date')) document.getElementById('edit-due-date').value = data.dueDate || '';
+            if (document.getElementById('edit-notes')) document.getElementById('edit-notes').value = data.notes || '';
 
-            // แสดงรูปภาพเอกสาร (ถ้ามีลิงก์ส่งมาจาก Sheets)
+            // แสดงรูปภาพ
             const poImage = document.getElementById('po-image');
             const placeholder = document.getElementById('img-placeholder');
             if (poImage && data.fileUrl) {
@@ -270,7 +380,7 @@
             }
         }
 
-        // บันทึกข้อมูลกลับไปที่ Sheets
+        // มัดรวมข้อมูล 15 ช่องส่งกลับไปบันทึก
         async function updateLineOrder() {
             const btn = document.getElementById('save-btn');
             btn.disabled = true;
@@ -280,11 +390,21 @@
                 action: 'updateLineOrder',
                 data: {
                     id: currentOrderId,
+                    allowConfirm: document.getElementById('edit-allow-confirm').checked,
                     confirmDate: document.getElementById('edit-confirm-date').value,
-                    adminName: document.getElementById('edit-admin-name').value,
+                    confirmTime: document.getElementById('edit-confirm-time').value,
                     hospitalName: document.getElementById('edit-hospital-name').value,
+                    adminName: document.getElementById('edit-admin-name').value,
                     taxId: document.getElementById('edit-tax-id').value,
-                    phone: document.getElementById('edit-phone').value
+                    address: document.getElementById('edit-address').value,
+                    phone: document.getElementById('edit-phone').value,
+                    poNumber: document.getElementById('edit-po-number').value,
+                    items: document.getElementById('edit-items').value,
+                    totalAmount: document.getElementById('edit-total').value,
+                    vatType: document.getElementById('edit-vat-type').value,
+                    conditions: document.getElementById('edit-conditions').value,
+                    dueDate: document.getElementById('edit-due-date').value,
+                    notes: document.getElementById('edit-notes').value
                 }
             };
 
@@ -311,7 +431,6 @@
             }
         }
 
-        // สั่งให้ AI สแกนวิเคราะห์ใหม่อีกครั้ง
         async function triggerAIOrderProcess() {
             const btn = document.getElementById('ai-btn');
             btn.disabled = true;
@@ -347,10 +466,12 @@
             }, 5000);
         }
 
-        document.getElementById('order-edit-form').addEventListener('input', () => {
-            isEditing = true;
-            document.getElementById('status-text').innerText = "✍️ กำลังพิมพ์แก้ไข... (หยุดรีเฟรชชั่วคราว)";
-        });
+        function setupEditListeners() {
+            document.getElementById('order-edit-form').addEventListener('input', () => {
+                isEditing = true;
+                document.getElementById('status-text').innerText = "✍️ กำลังพิมพ์แก้ไข... (หยุดรีเฟรชชั่วคราว)";
+            });
+        }
 
         function showToast(type, title, message) {
             const oldToast = document.getElementById('custom-toast');
