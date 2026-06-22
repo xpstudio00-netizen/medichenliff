@@ -176,6 +176,7 @@
 
         .btn-success { background: var(--success); color: white; }
         .btn-ai { background: linear-gradient(135deg, var(--primary), var(--ai-color)); color: white; }
+        .btn-outline { background: #f1f5f9; color: #334155; border: 1px solid var(--border); }
         .btn:hover { opacity: 0.9; }
         .btn:disabled { background: #cbd5e1; cursor: not-allowed; }
         
@@ -186,6 +187,23 @@
             color: #2563eb;
             padding-bottom: 8px;
         }
+
+        /* กล่องแสดงผล 14 บรรทัด */
+        #summary-section {
+            display: none; /* ซ่อนไว้ก่อน จะโชว์ตอนบันทึกสำเร็จ */
+        }
+        #summary-content {
+            white-space: pre-line;
+            font-size: 16px;
+            line-height: 1.8;
+            padding: 15px;
+            background: #f0fdf4;
+            border: 1px dashed #22c55e;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            color: #166534;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
@@ -195,7 +213,7 @@
         <div id="status-text">กำลังโหลดข้อมูล...</div>
     </div>
 
-    <div class="card">
+    <div class="card" id="image-card">
         <div class="card-title">🖼️ เอกสารอ้างอิง (PO)</div>
         <div class="image-container">
             <div id="img-placeholder" style="color: var(--text-muted); font-size: 14px;">กำลังโหลดรูปภาพเอกสาร...</div>
@@ -203,7 +221,7 @@
         </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="form-card">
         <form id="order-edit-form" onsubmit="event.preventDefault();">
             
             <div class="checkbox-group">
@@ -305,6 +323,18 @@
         </form>
     </div>
 
+    <div class="card" id="summary-section">
+        <div class="card-title text-success">✅ บันทึกข้อมูลออเดอร์เรียบร้อยแล้ว</div>
+        
+        <div id="summary-content">
+            </div>
+
+        <div class="btn-group">
+            <button class="btn btn-success" onclick="copySummaryToClipboard()">📋 คัดลอกข้อความสรุป</button>
+            <button class="btn btn-outline" onclick="location.reload()">🔄 กลับไปแก้ไขฟอร์มเดิม</button>
+        </div>
+    </div>
+
     <script>
         // 🔴 อย่าลืมเปลี่ยนเป็น URL Web App ตัวล่าสุด
         const API_URL = "https://script.google.com/macros/s/AKfycbzUSfC0UMS1rLJTpVBbL1koAKUkHZcLIlQvLz98J2UzSwFUo-2sdqckWaiXNoEGgWJd/exec";
@@ -347,12 +377,8 @@
             }
         }
 
-        // นำข้อมูลลงฟอร์ม 15 ช่อง
         function mapDataToForm(data) {
-            // Checkbox
             if (document.getElementById('edit-allow-confirm')) document.getElementById('edit-allow-confirm').checked = data.allowConfirm === true || data.allowConfirm === "true";
-            
-            // Text / Date / Time Inputs
             if (document.getElementById('edit-confirm-date')) document.getElementById('edit-confirm-date').value = data.confirmDate || '';
             if (document.getElementById('edit-confirm-time')) document.getElementById('edit-confirm-time').value = data.confirmTime || '';
             if (document.getElementById('edit-hospital-name')) document.getElementById('edit-hospital-name').value = data.hospitalName || data.company || '';
@@ -368,7 +394,6 @@
             if (document.getElementById('edit-due-date')) document.getElementById('edit-due-date').value = data.dueDate || '';
             if (document.getElementById('edit-notes')) document.getElementById('edit-notes').value = data.notes || '';
 
-            // แสดงรูปภาพ
             const poImage = document.getElementById('po-image');
             const placeholder = document.getElementById('img-placeholder');
             if (poImage && data.fileUrl) {
@@ -380,7 +405,6 @@
             }
         }
 
-        // มัดรวมข้อมูล 15 ช่องส่งกลับไปบันทึก
         async function updateLineOrder() {
             const btn = document.getElementById('save-btn');
             btn.disabled = true;
@@ -419,8 +443,12 @@
                 btn.disabled = false;
 
                 if (res.status === 'success') {
-                    showToast('success', 'สำเร็จ', 'บันทึกข้อมูลออเดอร์เรียบร้อยแล้ว');
+                    showToast('success', 'สำเร็จ', 'บันทึกข้อมูลและดึงหน้าสรุปเรียบร้อยแล้ว');
                     isEditing = false; 
+                    
+                    // ✨ เรียกฟังก์ชันโชว์หน้าสรุปแทนการเปลี่ยนหน้า
+                    showSummaryView(payload.data);
+
                 } else {
                     showToast('error', 'ล้มเหลว', res.message || 'บันทึกไม่สำเร็จ');
                 }
@@ -429,6 +457,50 @@
                 btn.disabled = false;
                 showToast('error', 'เชื่อมต่อล้มเหลว', error.message);
             }
+        }
+
+        // --- ฟังก์ชันใหม่: ซ่อนฟอร์มและโชว์หน้าสรุป 14 บรรทัด ---
+        function showSummaryView(data) {
+            // 1. ซ่อนกล่องฟอร์ม
+            document.getElementById('form-card').style.display = 'none';
+            // 2. โชว์กล่องสรุป
+            document.getElementById('summary-section').style.display = 'block';
+
+            const allowText = data.allowConfirm ? "อนุญาตคอนเฟิร์ม" : "ไม่อนุญาตคอนเฟิร์ม";
+            
+            // 3. จัดเรียงข้อมูล 14 บรรทัด
+            const lines = [
+                `${data.adminName || "-"} ${allowText}`,
+                `${data.confirmDate || "-"} ${data.confirmTime || "-"}`,
+                `${data.hospitalName || "-"}`,
+                `${data.taxId || "-"}`,
+                `${data.address || "-"}`,
+                `${data.phone || "-"}`,
+                `${data.poNumber || "-"}`,
+                `${data.notes || "-"}`,
+                `${data.items || "-"}`,
+                `${data.totalAmount || "0"}`,
+                `${data.vatType || "-"}`,
+                `${data.conditions || "-"}`,
+                `${data.dueDate || "-"}`,
+                `ขอบพระคุณครับ`
+            ];
+
+            // 4. เอาข้อมูลไปใส่ในหน้าจอ และเก็บไว้เผื่อกด Copy
+            window.textToCopy = lines.join('\n');
+            document.getElementById('summary-content').innerText = window.textToCopy;
+
+            // เลื่อนหน้าจอกลับไปด้านบนสุด
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // --- ฟังก์ชันใหม่: คัดลอกข้อความ ---
+        function copySummaryToClipboard() {
+            navigator.clipboard.writeText(window.textToCopy).then(() => {
+                showToast('success', 'สำเร็จ', 'คัดลอกข้อความสรุปเรียบร้อยแล้ว!');
+            }).catch(err => {
+                alert('ไม่สามารถคัดลอกได้ กรุณาคัดลอกด้วยตนเอง');
+            });
         }
 
         async function triggerAIOrderProcess() {
@@ -462,7 +534,10 @@
 
         function startAutoRefresh() {
             refreshInterval = setInterval(() => {
-                fetchOrderData();
+                // หยุดดึงข้อมูลถ้ากำลังพิมพ์ฟอร์ม หรือเปิดหน้าสรุปไปแล้ว
+                if(!isEditing && document.getElementById('summary-section').style.display !== 'block') {
+                    fetchOrderData();
+                }
             }, 5000);
         }
 
