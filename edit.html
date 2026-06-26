@@ -188,9 +188,8 @@
             padding-bottom: 8px;
         }
 
-        /* กล่องแสดงผล 14 บรรทัด */
         #summary-section {
-            display: none; /* ซ่อนไว้ก่อน จะโชว์ตอนบันทึกสำเร็จ */
+            display: none; 
         }
         #summary-content {
             white-space: pre-line;
@@ -280,8 +279,12 @@
             </div>
 
             <div class="form-group">
-                <label>รายการออเดอร์ (สินค้า / จำนวน)</label>
-                <textarea id="edit-items" class="form-control" placeholder="รายการสินค้า..."></textarea>
+                <label style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <span>📦 รายการออเดอร์ (สินค้า / จำนวน)</span>
+                    <button type="button" class="btn-outline" style="padding: 4px 10px; font-size: 13px; border-radius: 6px; cursor: pointer; border: 1px solid var(--border);" onclick="addItemInputField('')">➕ เพิ่มช่องรายการ</button>
+                </label>
+                <div id="dynamic-items-container" style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+                    </div>
             </div>
 
             <div class="form-row">
@@ -326,8 +329,7 @@
     <div class="card" id="summary-section">
         <div class="card-title text-success">✅ บันทึกข้อมูลออเดอร์เรียบร้อยแล้ว</div>
         
-        <div id="summary-content">
-            </div>
+        <div id="summary-content"></div>
 
         <div class="btn-group">
             <button class="btn btn-success" onclick="copySummaryToClipboard()">📋 คัดลอกข้อความสรุป</button>
@@ -336,7 +338,6 @@
     </div>
 
     <script>
-        // 🔴 อย่าลืมเปลี่ยนเป็น URL Web App ตัวล่าสุด
         const API_URL = "https://script.google.com/macros/s/AKfycbzUSfC0UMS1rLJTpVBbL1koAKUkHZcLIlQvLz98J2UzSwFUo-2sdqckWaiXNoEGgWJd/exec";
 
         let currentOrderId = null;
@@ -355,7 +356,6 @@
 
             fetchOrderData();
             startAutoRefresh();
-            setupEditListeners();
         });
 
         async function fetchOrderData() {
@@ -377,6 +377,39 @@
             }
         }
 
+        // ฟังก์ชันสร้างกล่องข้อความรายการสินค้าแบบไดนามิก
+        function addItemInputField(value) {
+            const container = document.getElementById('dynamic-items-container');
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.gap = '8px';
+            row.style.alignItems = 'center';
+            row.className = 'item-product-row';
+
+            // ลบพวกตัวเลขนำหน้า "1. ", "2. " ออกเพื่อให้แอดมินแก้ไขข้อความได้สะอาดตา
+            let cleanValue = value.replace(/^\d+[\.\s\-:\)]+\s*/, '').trim();
+
+            row.innerHTML = `
+                <input type="text" class="form-control single-item-input" value="${cleanValue}" placeholder="ชื่อสินค้า ขนาด จำนวน หน่วย..." required>
+                <button type="button" style="background: #ef4444; color: white; border: none; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-weight: 600;" onclick="this.parentElement.remove(); isEditing = true; checkItemsCount();">🗑️</button>
+            `;
+            container.appendChild(row);
+
+            // บังคับเปลี่ยนสถานะเป็นเปิดโหมดแก้ไขเมื่อพิมพ์
+            row.querySelector('.single-item-input').addEventListener('input', () => {
+                isEditing = true;
+                document.getElementById('status-text').innerText = "✍️ กำลังพิมพ์แก้ไข... (หยุดรีเฟรชชั่วคราว)";
+            });
+        }
+
+        // ดักเช็คถ้าลบจนหมด ให้เหลือช่องว่างเปล่าไว้อย่างน้อย 1 ช่อง
+        function checkItemsCount() {
+            const container = document.getElementById('dynamic-items-container');
+            if (container.children.length === 0) {
+                addItemInputField('');
+            }
+        }
+
         function mapDataToForm(data) {
             if (document.getElementById('edit-allow-confirm')) document.getElementById('edit-allow-confirm').checked = data.allowConfirm === true || data.allowConfirm === "true";
             if (document.getElementById('edit-confirm-date')) document.getElementById('edit-confirm-date').value = data.confirmDate || '';
@@ -387,12 +420,27 @@
             if (document.getElementById('edit-address')) document.getElementById('edit-address').value = data.address || data.destination || '';
             if (document.getElementById('edit-phone')) document.getElementById('edit-phone').value = data.phone || '';
             if (document.getElementById('edit-po-number')) document.getElementById('edit-po-number').value = data.poNumber || '';
-            if (document.getElementById('edit-items')) document.getElementById('edit-items').value = data.product || data.items || '';
             if (document.getElementById('edit-total')) document.getElementById('edit-total').value = data.totalAmount || data.price || '';
             if (document.getElementById('edit-vat-type')) document.getElementById('edit-vat-type').value = data.vatType || '';
             if (document.getElementById('edit-conditions')) document.getElementById('edit-conditions').value = data.conditions || '';
             if (document.getElementById('edit-due-date')) document.getElementById('edit-due-date').value = data.dueDate || '';
             if (document.getElementById('edit-notes')) document.getElementById('edit-notes').value = data.notes || '';
+
+            // 📦 กระบวนการแตกแยกฟิลด์รายการสินค้าที่สแกนมาได้
+            const container = document.getElementById('dynamic-items-container');
+            container.innerHTML = ''; // ล้างช่องเก่าออกก่อนแมปค่าใหม่
+            
+            const rawItems = data.product || data.items || '';
+            if (rawItems) {
+                const lines = rawItems.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                if (lines.length > 0) {
+                    lines.forEach(line => addItemInputField(line));
+                } else {
+                    addItemInputField('');
+                }
+            } else {
+                addItemInputField('');
+            }
 
             const poImage = document.getElementById('po-image');
             const placeholder = document.getElementById('img-placeholder');
@@ -403,6 +451,8 @@
             } else if (placeholder) {
                 placeholder.innerText = "❌ ไม่พบไฟล์เอกสารแนบ";
             }
+            
+            setupEditListeners();
         }
 
         async function updateLineOrder() {
@@ -410,6 +460,16 @@
             btn.disabled = true;
             const loadingToast = showToast('loading', 'กำลังบันทึกข้อมูล', 'กรุณารอสักครู่...');
             
+            // 🔄 รวบรวมรายการสินค้าจากช่องไดนามิกทั้งหมดกลับมารวมเป็นข้อความแบบต่อบรรทัด
+            const itemInputs = document.querySelectorAll('.single-item-input');
+            let combinedItemsArray = [];
+            itemInputs.forEach((input, index) => {
+                if (input.value.trim()) {
+                    combinedItemsArray.push(`${index + 1}. ${input.value.trim()}`);
+                }
+            });
+            const formattedItemsString = combinedItemsArray.join('\n');
+
             const payload = {
                 action: 'updateLineOrder',
                 data: {
@@ -423,7 +483,7 @@
                     address: document.getElementById('edit-address').value,
                     phone: document.getElementById('edit-phone').value,
                     poNumber: document.getElementById('edit-po-number').value,
-                    items: document.getElementById('edit-items').value,
+                    items: formattedItemsString, // ส่งชุดข้อความที่รวบรวมเรียงบรรทัดกลับไป Sheets
                     totalAmount: document.getElementById('edit-total').value,
                     vatType: document.getElementById('edit-vat-type').value,
                     conditions: document.getElementById('edit-conditions').value,
@@ -445,10 +505,7 @@
                 if (res.status === 'success') {
                     showToast('success', 'สำเร็จ', 'บันทึกข้อมูลและดึงหน้าสรุปเรียบร้อยแล้ว');
                     isEditing = false; 
-                    
-                    // ✨ เรียกฟังก์ชันโชว์หน้าสรุปแทนการเปลี่ยนหน้า
                     showSummaryView(payload.data);
-
                 } else {
                     showToast('error', 'ล้มเหลว', res.message || 'บันทึกไม่สำเร็จ');
                 }
@@ -459,16 +516,12 @@
             }
         }
 
-        // --- ฟังก์ชันใหม่: ซ่อนฟอร์มและโชว์หน้าสรุป 14 บรรทัด ---
         function showSummaryView(data) {
-            // 1. ซ่อนกล่องฟอร์ม
             document.getElementById('form-card').style.display = 'none';
-            // 2. โชว์กล่องสรุป
             document.getElementById('summary-section').style.display = 'block';
 
             const allowText = data.allowConfirm ? "อนุญาตคอนเฟิร์ม" : "ไม่อนุญาตคอนเฟิร์ม";
             
-            // 3. จัดเรียงข้อมูล 14 บรรทัด
             const lines = [
                 `${data.adminName || "-"} ${allowText}`,
                 `${data.confirmDate || "-"} ${data.confirmTime || "-"}`,
@@ -486,15 +539,11 @@
                 `ขอบพระคุณครับ`
             ];
 
-            // 4. เอาข้อมูลไปใส่ในหน้าจอ และเก็บไว้เผื่อกด Copy
             window.textToCopy = lines.join('\n');
             document.getElementById('summary-content').innerText = window.textToCopy;
-
-            // เลื่อนหน้าจอกลับไปด้านบนสุด
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // --- ฟังก์ชันใหม่: คัดลอกข้อความ ---
         function copySummaryToClipboard() {
             navigator.clipboard.writeText(window.textToCopy).then(() => {
                 showToast('success', 'สำเร็จ', 'คัดลอกข้อความสรุปเรียบร้อยแล้ว!');
@@ -534,7 +583,6 @@
 
         function startAutoRefresh() {
             refreshInterval = setInterval(() => {
-                // หยุดดึงข้อมูลถ้ากำลังพิมพ์ฟอร์ม หรือเปิดหน้าสรุปไปแล้ว
                 if(!isEditing && document.getElementById('summary-section').style.display !== 'block') {
                     fetchOrderData();
                 }
@@ -542,9 +590,13 @@
         }
 
         function setupEditListeners() {
-            document.getElementById('order-edit-form').addEventListener('input', () => {
-                isEditing = true;
-                document.getElementById('status-text').innerText = "✍️ กำลังพิมพ์แก้ไข... (หยุดรีเฟรชชั่วคราว)";
+            // ผูก Event เพิ่มเติมกับ Element อื่นๆ บนฟอร์ม
+            const formElements = document.querySelectorAll('#order-edit-form input:not(.single-item-input), #order-edit-form textarea, #order-edit-form select');
+            formElements.forEach(element => {
+                element.addEventListener('input', () => {
+                    isEditing = true;
+                    document.getElementById('status-text').innerText = "✍️ กำลังพิมพ์แก้ไข... (หยุดรีเฟรชชั่วคราว)";
+                });
             });
         }
 
